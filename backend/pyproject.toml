@@ -1,0 +1,62 @@
+[project]
+name = "voiceeval"
+version = "0.1.0"
+description = "VoiceEval backend — voice-agent evaluation control plane and realtime runtime"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy[asyncio]>=2.0.35",
+    "asyncpg>=0.30.0",
+    "alembic>=1.13.0",
+    "redis>=5.1.0",
+    "arq>=0.26.0",
+    "PyJWT>=2.9.0",
+    "websockets>=13.0",
+    "ulid-py>=1.1.0",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-exporter-otlp>=1.27.0",
+    # Pipecat caller runtime (naive pipecat agent over websocket targets).
+    # The openai/silero extras supply the LLM and VAD plugins. The `sarvam`
+    # extra is deliberately NOT requested: it pins sarvamai==0.1.28, which
+    # conflicts with this project's sarvamai>=0.1.35 floor (declared below).
+    "pipecat-ai[openai,silero]>=1.12.0",
+    # LiveKit caller runtime (docs/V2-changes/caller-migration-to-livekit.md).
+    # Lower bounds only; exact versions are pinned after the phase-0 spike (§14.0).
+    "livekit-agents>=1.2.0",
+    "livekit-api>=1.0.0",
+    "livekit-plugins-sarvam>=0.7.0",
+    "livekit-plugins-silero>=1.2.0",
+    "sarvamai>=0.1.35",
+    "httpx>=0.27.0",
+    "cryptography>=50.0.2",
+    "boto3>=1.34.0",
+    # Voice-Agent Judge Stage 0 audio DSP + VAD (docs/V2-changes/judge-implementation.md).
+    "numpy>=1.26.0",
+    "onnxruntime>=1.18.0",
+    "aiortc>=1.15.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/voiceeval"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]

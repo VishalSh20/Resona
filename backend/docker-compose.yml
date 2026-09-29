@@ -1,0 +1,198 @@
+# VoiceEval v1 local environment.
+# Secrets are supplied via a local `.env` (see .env.example) using variable
+# interpolation; every value here has a safe default so `docker compose config`
+# and `docker compose up` work even before a `.env` is created.
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+asyncpg://voiceeval:voiceeval@postgres:5432/voiceeval
+  REDIS_URL: redis://redis:6379/0
+  # local | s3. Set OBJECT_STORAGE_MODE=s3 in .env to ship media to the bucket.
+  OBJECT_STORAGE_MODE: ${OBJECT_STORAGE_MODE:-local}
+  LOCAL_OBJECT_STORAGE_PATH: /app/data/object-store
+  # S3 backend (real AWS or an S3-compatible endpoint). Left unset = AWS default
+  # endpoint. Credentials come from .env (never committed).
+  S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+  S3_REGION: ${AWS_REGION:-us-east-1}
+  S3_ACCESS_KEY: ${AWS_ACCESS_TOKEN:-}
+  S3_SECRET_KEY: ${AWS_ACCESS_SECRET:-}
+  JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-a-real-32-byte-secret}
+  JWT_ISSUER: ${JWT_ISSUER:-voiceeval}
+  # Master key (Fernet, 32 url-safe base64 bytes) that encrypts provider
+  # credentials at rest. Generate with:
+  #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+  # LLM generation / decision-model providers (used by the evaluator-generation
+  # workflows). The keys are optional; the backend fails fast only when a
+  # workflow actually needs one.
+  LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-5-haiku-latest}
+  ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+  OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-6-luna}
+  OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+  JEV_MODEL: ${JEV_MODEL:-typesafe/jev-1.13}
+  JEV_BASE_URL: ${JEV_BASE_URL:-https://openrouter.ai/api/alpha/decisions}
+  SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  # Room/SIP targets are served by the LiveKit dispatcher (not the legacy
+  # adapter path).
+  RUNNER_DISPATCH_MODE: ${RUNNER_DISPATCH_MODE:-livekit}
+  LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-LKc646c4abbf72}
+  LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-hWRSObUtC4SMk0ixRMzNg6C6dnZE4oBC}
+  LIVEKIT_AGENT_NAME: ${LIVEKIT_AGENT_NAME:-voiceeval-caller}
+  # Concurrent calls the batcher keeps in flight: overall, and per target
+  # revision. Raise per-target to run more evaluators of one agent in parallel.
+  LIVEKIT_MAX_CONCURRENT_CALLS: ${LIVEKIT_MAX_CONCURRENT_CALLS:-20}
+  LIVEKIT_MAX_CONCURRENT_PER_TARGET: ${LIVEKIT_MAX_CONCURRENT_PER_TARGET:-3}
+  # Per-room idle timeout we set at room creation. Must exceed the longest call
+  # or LiveKit reaps the room mid-call and shuts the caller job down (which also
+  # aborts the recording upload). The control plane deletes the room on terminal.
+  LIVEKIT_ROOM_EMPTY_TIMEOUT_S: ${LIVEKIT_ROOM_EMPTY_TIMEOUT_S:-300}
+
+# Host-networked services (api/worker/livekit-agent) share the host network with
+# the LiveKit server (deploy/livekit) and reach the bridge-network infra
+# (postgres/redis) through localhost's published ports. The host firewall blocks
+# container->host traffic, so joining the compose bridge would strand them from
+# LiveKit.
+x-host-env: &host-env
+  DATABASE_URL: postgresql+asyncpg://voiceeval:voiceeval@localhost:5432/voiceeval
+  REDIS_URL: redis://localhost:6379/0
+  LIVEKIT_URL: ws://localhost:7880
+  RUNNER_BACKEND_URL: http://localhost:8000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: voiceeval
+      POSTGRES_PASSWORD: voiceeval
+      POSTGRES_DB: voiceeval
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voiceeval -d voiceeval"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    # MinIO no longer publishes free official images (Docker Hub deleted,
+    # Quay.io auth-gated). coollabsio/minio is an automated rebuild from
+    # official MinIO releases; pin a specific RELEASE tag for anything beyond
+    # local development.
+    image: coollabsio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # The UBI9-micro base has no curl/wget; probe the S3 API port directly
+      # via bash's /dev/tcp. start_period covers first-boot pool formatting.
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/9000' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  api:
+    build: .
+    command: ["uvicorn", "voiceeval.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Host network: reaches the host-networked LiveKit server and the published
+    # postgres/redis ports on localhost. Binds :8000 on the host directly.
+    network_mode: host
+    environment:
+      <<: [*host-env, *backend-env]
+      APP_HOST: 0.0.0.0
+      APP_PORT: "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - object_data:/app/data
+
+  worker:
+    build: .
+    # One ARQ worker per named queue (see scripts/run_workers.py).
+    command: ["python", "scripts/run_workers.py"]
+    # Host network: the LiveKit dispatcher creates rooms on the host-networked
+    # LiveKit server (localhost:7880).
+    network_mode: host
+    environment:
+      <<: [*host-env, *backend-env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # LiveKit Agents caller worker. Registers as ``LIVEKIT_AGENT_NAME`` and receives
+  # the explicit per-attempt dispatch (see runtime/livekit/job.py). Must run with
+  # host networking to match the host-networked LiveKit server: it advertises
+  # RTC media on 127.0.0.1, so a bridge container could not exchange media.
+  # With host networking it reaches PostgreSQL/Redis/API via the host's published
+  # ports, hence the localhost overrides below.
+  livekit-agent:
+    build: .
+    # ``start`` is the LiveKit Agents production worker subcommand (the bare
+    # module prints CLI help and exits).
+    command: ["python", "-m", "voiceeval.runtime.livekit.job", "start"]
+    network_mode: host
+    environment:
+      <<: [*host-env, *backend-env]
+    volumes:
+      - object_data:/app/data
+    depends_on:
+      - api
+
+  # Deterministic fake voice agent for local end-to-end runs. Point a target
+  # revision at ws://fake-target:8790/target (adapter_name=fake).
+  fake-target:
+    build: .
+    profiles: ["dev"]
+    command: ["python", "-m", "voiceeval.runtime.fake_target"]
+    environment:
+      <<: *backend-env
+    ports:
+      - "8790:8790"
+
+  # The runner is disposable and horizontally scalable. For v1 it is a manual
+  # or ARQ-dispatched container process; it does not auto-scale here.
+  runner:
+    build: .
+    profiles: ["runner"]
+    command: ["python", "-m", "voiceeval.runtime.runner"]
+    environment:
+      <<: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:
+  object_data:
