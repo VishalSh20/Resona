@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Object storage (local mode)
+data/
+*.log
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Command Code
+.commandcode/
+
+# Playwright CLI scratch
+.playwright-cli/
