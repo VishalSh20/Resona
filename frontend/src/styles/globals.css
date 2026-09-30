@@ -1,0 +1,14 @@
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    background-color: var(--canvas);
+    color: var(--foreground);
+  }
+
+  ::selection {
+    background-color: var(--surface-selected);
+  }
+}
