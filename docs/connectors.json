@@ -1,0 +1,417 @@
+{
+  "version": 1,
+  "connection_kinds": {
+    "websocket": {
+      "transport": "bridge",
+      "label": "WebSocket",
+      "media": "websocket-pcm"
+    },
+    "webrtc": {
+      "transport": "room",
+      "label": "WebRTC",
+      "media": "webrtc",
+      "alternate_transport": "whip"
+    },
+    "sip": {
+      "transport": "sip",
+      "label": "SIP trunk (PSTN / SBC)",
+      "media": "sip",
+      "supports_dtmf": true
+    }
+  },
+  "universal_kinds": [
+    "sip"
+  ],
+  "provider_capabilities": [
+    {
+      "provider": "retell",
+      "display_name": "Retell",
+      "default_connection": "webrtc",
+      "default_transport": "whip",
+      "requires_client_config": false,
+      "supports": {
+        "websocket": true,
+        "webrtc": true,
+        "sip": true
+      }
+    },
+    {
+      "provider": "vapi",
+      "display_name": "Vapi",
+      "default_connection": "websocket",
+      "default_transport": "bridge",
+      "requires_client_config": false,
+      "supports": {
+        "websocket": true,
+        "webrtc": true,
+        "sip": true
+      }
+    },
+    {
+      "provider": "elevenlabs",
+      "display_name": "ElevenLabs",
+      "default_connection": "webrtc",
+      "default_transport": "room",
+      "requires_client_config": false,
+      "supports": {
+        "websocket": true,
+        "webrtc": true,
+        "sip": true
+      }
+    },
+    {
+      "provider": "livekit",
+      "display_name": "LiveKit",
+      "default_connection": "webrtc",
+      "default_transport": "room",
+      "requires_client_config": false,
+      "supports": {
+        "websocket": false,
+        "webrtc": true,
+        "sip": true
+      }
+    },
+    {
+      "provider": "pipecat",
+      "display_name": "Pipecat Cloud",
+      "default_connection": "websocket",
+      "default_transport": "bridge",
+      "requires_client_config": false,
+      "supports": {
+        "websocket": true,
+        "webrtc": true,
+        "sip": true
+      }
+    },
+    {
+      "provider": "sip",
+      "display_name": "SIP (configured trunk)",
+      "default_connection": "sip",
+      "default_transport": "sip",
+      "requires_client_config": false,
+      "supports": {
+        "websocket": false,
+        "webrtc": false,
+        "sip": true
+      }
+    },
+    {
+      "provider": "custom",
+      "display_name": "Custom / other agent",
+      "default_connection": null,
+      "default_transport": null,
+      "requires_client_config": true,
+      "supports": {
+        "websocket": true,
+        "webrtc": true,
+        "sip": true
+      }
+    }
+  ],
+  "notes": [
+    "sip is universal: any agent reachable by a number or SIP URI can be dialed via a client-supplied trunk (kind=sip).",
+    "websocket/webrtc are only usable for an agent that actually exposes such an endpoint.",
+    "Regardless of a provider's default, the client can attach ANY kind to ANY target via POST /targets/{id}/connection.",
+    "default_connection = the connection we use automatically for that provider (no client config needed)."
+  ],
+  "provider_agents": [
+    {
+      "provider": "retell",
+      "display_name": "Retell",
+      "connection_mode": "automatic",
+      "transport": "whip",
+      "fields": [
+        {
+          "key": "api_key",
+          "label": "API Key",
+          "secret": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "provider": "vapi",
+      "display_name": "Vapi",
+      "connection_mode": "automatic",
+      "transport": "bridge",
+      "fields": [
+        {
+          "key": "api_key",
+          "label": "API Key",
+          "secret": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "provider": "elevenlabs",
+      "display_name": "ElevenLabs",
+      "connection_mode": "automatic",
+      "transport": "room",
+      "fields": [
+        {
+          "key": "api_key",
+          "label": "API Key",
+          "secret": true,
+          "required": true
+        },
+        {
+          "key": "livekit_url",
+          "label": "LiveKit URL",
+          "secret": false,
+          "required": false
+        }
+      ]
+    },
+    {
+      "provider": "livekit",
+      "display_name": "LiveKit",
+      "connection_mode": "automatic",
+      "transport": "room",
+      "fields": [
+        {
+          "key": "api_key",
+          "label": "API Key",
+          "secret": true,
+          "required": true
+        },
+        {
+          "key": "api_secret",
+          "label": "API Secret",
+          "secret": true,
+          "required": true
+        },
+        {
+          "key": "url",
+          "label": "LiveKit URL",
+          "secret": false,
+          "required": true
+        }
+      ]
+    },
+    {
+      "provider": "pipecat",
+      "display_name": "Pipecat Cloud",
+      "connection_mode": "automatic",
+      "transport": "bridge",
+      "fields": [
+        {
+          "key": "api_token",
+          "label": "API Token",
+          "secret": true,
+          "required": true
+        }
+      ]
+    },
+    {
+      "provider": "sip",
+      "display_name": "SIP (configured trunk)",
+      "connection_mode": "account_provisioned",
+      "transport": "sip",
+      "fields": [
+        {
+          "key": "address",
+          "label": "SIP address (host/domain)",
+          "secret": false,
+          "required": true
+        },
+        {
+          "key": "from_number",
+          "label": "From number / caller ID",
+          "secret": false,
+          "required": false
+        },
+        {
+          "key": "transport",
+          "label": "Transport (auto|udp|tcp|tls)",
+          "secret": false,
+          "required": false
+        },
+        {
+          "key": "username",
+          "label": "SIP username",
+          "secret": true,
+          "required": false
+        },
+        {
+          "key": "password",
+          "label": "SIP password",
+          "secret": true,
+          "required": false
+        }
+      ]
+    }
+  ],
+  "client_connections": [
+    {
+      "kind": "websocket",
+      "label": "WebSocket",
+      "transport": "bridge",
+      "config": [
+        {
+          "key": "url",
+          "label": "WebSocket URL (wss://...)",
+          "type": "string",
+          "required": true
+        },
+        {
+          "key": "headers",
+          "label": "Extra headers",
+          "type": "object",
+          "required": false
+        },
+        {
+          "key": "provider",
+          "label": "Protocol",
+          "type": "string",
+          "required": false,
+          "default": "custom",
+          "enum": [
+            "custom",
+            "vapi",
+            "retell",
+            "pipecat",
+            "elevenlabs"
+          ]
+        }
+      ],
+      "secrets": [
+        {
+          "key": "authorization",
+          "label": "Authorization header value",
+          "required": false
+        }
+      ]
+    },
+    {
+      "kind": "webrtc",
+      "label": "WebRTC",
+      "transport": "room",
+      "transport_overrides": {
+        "room": {
+          "config": [
+            {
+              "key": "url",
+              "label": "LiveKit URL (wss://...)",
+              "type": "string",
+              "required": true
+            }
+          ],
+          "secrets": [
+            {
+              "key": "token",
+              "label": "LiveKit access token",
+              "required": true
+            }
+          ]
+        },
+        "whip": {
+          "config": [
+            {
+              "key": "call_id",
+              "label": "Call id",
+              "type": "string",
+              "required": false
+            },
+            {
+              "key": "proxy_url",
+              "label": "WHIP proxy URL",
+              "type": "string",
+              "required": false
+            },
+            {
+              "key": "base_url",
+              "label": "Provider base URL",
+              "type": "string",
+              "required": false
+            },
+            {
+              "key": "ice_servers",
+              "label": "ICE servers",
+              "type": "array",
+              "required": false
+            },
+            {
+              "key": "identity",
+              "label": "Identity",
+              "type": "string",
+              "required": false,
+              "default": "client"
+            }
+          ],
+          "secrets": [
+            {
+              "key": "access_token",
+              "label": "Access token",
+              "required": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "sip",
+      "label": "SIP trunk (outbound via your credentials)",
+      "transport": "sip",
+      "config": [
+        {
+          "key": "address",
+          "label": "SIP address (host:port)",
+          "type": "string",
+          "required": true
+        },
+        {
+          "key": "transport",
+          "label": "Transport",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "auto",
+            "udp",
+            "tcp",
+            "tls"
+          ],
+          "default": "tls"
+        },
+        {
+          "key": "from_number",
+          "label": "From number / caller ID",
+          "type": "string",
+          "required": false
+        },
+        {
+          "key": "to_number",
+          "label": "Destination number (E.164)",
+          "type": "string",
+          "required": false
+        },
+        {
+          "key": "sip_uri",
+          "label": "Destination SIP URI",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "rules": [
+        "to_number or sip_uri is required"
+      ],
+      "secrets": [
+        {
+          "key": "username",
+          "label": "SIP username",
+          "required": false
+        },
+        {
+          "key": "password",
+          "label": "SIP password",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "endpoints": {
+    "connectors": "GET /api/v1/integrations/connectors",
+    "set_connection": "POST /api/v1/targets/{target_id}/connection",
+    "create_account": "POST /api/v1/integrations/accounts"
+  }
+}
