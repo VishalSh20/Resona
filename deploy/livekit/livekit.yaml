@@ -1,0 +1,45 @@
+# Self-hosted LiveKit server (single node, local/dev).
+#
+# Keys are the pair shared with the backend (.env: LIVEKIT_API_KEY / LIVEKIT_API_SECRET).
+# For a public / remote deployment set `rtc.use_external_ip: true` (or pin node_ip
+# to the public address) and open the UDP port range listed under `rtc`.
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  # Local/dev: advertise the loopback address. For a public host, remove this
+  # and set `use_external_ip: true`.
+  use_external_ip: false
+  node_ip: 127.0.0.1
+
+room:
+  # Keep a room alive well past the longest call: a short timeout reaps it
+  # mid-call (IDLE_TIMEOUT) and shuts the caller job down before it can upload.
+  # The control plane deletes the room on terminal; the reaper sweeps strays.
+  empty_timeout: 900
+  departure_timeout: 30
+  max_participants: 8
+
+# Redis brokers the SIP service (``livekit-sip``) with this server. Required for
+# the SIP API (create outbound trunks / SIP participants). Locally we reuse the
+# backend stack's redis (see backend/docker-compose.yml) as host networking puts
+# both on the host's localhost.
+redis:
+  address: localhost:6379
+
+# SIP telephony is served by the separate ``livekit-sip`` process (see
+# docker-compose.yml). Dynamic outbound trunks are created through the API and
+# stored in redis, so no static ``sip:`` block is needed here.
+#
+# NOTE (local dev): real PSTN media needs a publicly reachable SIP/RTP endpoint.
+# With host networking on a laptop, dialing a *local* SIP endpoint works; dialing
+# Exotel/PSTN will connect signaling but media will not flow until this runs on a
+# host with a public IP (or you switch to LiveKit Cloud).
+
+logging:
+  level: info
+  json: true
+
+keys:
+  LKc646c4abbf72: hWRSObUtC4SMk0ixRMzNg6C6dnZE4oBC
